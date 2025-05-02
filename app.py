@@ -6,18 +6,21 @@ from nltk.stem import WordNetLemmatizer
 import nltk
 import langdetect
 from langdetect import detect
-import random
 
+# Descargar recursos necesarios de NLTK
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# Cargar modelos
-with open('model.pkl', 'rb') as model_file:
-    model = pickle.load(model_file)
-
-with open('vectorizer.pkl', 'rb') as vec_file:
-    vectorizer = pickle.load(vec_file)
+# Cargar modelos desde los archivos pickle
+try:
+    with open('model.pkl', 'rb') as model_file:
+        model = pickle.load(model_file)
+    with open('vectorizer.pkl', 'rb') as vec_file:
+        vectorizer = pickle.load(vec_file)
+except FileNotFoundError as e:
+    st.error(f"Error: No se encontraron los archivos necesarios: {e}")
+    st.stop()
 
 # Preprocesamiento de texto
 stop_words_en = set(stopwords.words('english'))
@@ -26,13 +29,11 @@ lemmatizer = WordNetLemmatizer()
 
 def preprocess(text, lang):
     tokens = word_tokenize(text.lower())
-    if lang == 'es':
-        stop_words = stop_words_es
-    else:
-        stop_words = stop_words_en
+    stop_words = stop_words_es if lang == 'es' else stop_words_en
     tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalnum() and word not in stop_words]
     return ' '.join(tokens)
 
+# Generar recomendaciones para el tuit
 def generate_recommendations(tweet, lang):
     recommendations = []
     if len(tweet.split()) < 5:
@@ -49,31 +50,38 @@ def generate_recommendations(tweet, lang):
         recommendations.append("Incluye palabras clave populares como 'gratis', 'nuevo' o 'hoy'." if lang == 'es' else "Include popular keywords like 'free', 'new', or 'today'.")
     return recommendations
 
-# Interfaz Streamlit
+# Interfaz en Streamlit
 st.title("🧠 Predicción de Tuits Virales con IA")
 st.write("¡Hola! 👋 Soy tu asistente de predicción de tuits virales.")
 
+# Solicitar nombre del usuario
 user_name = st.text_input("Primero, ¿cómo te llamas? 😊")
 if user_name:
     st.write(f"¡Encantado de conocerte, {user_name}! 🎉")
-
     st.write("Estoy aquí para ayudarte a predecir si tu tuit tiene potencial de ser viral.")
+
+    # Solicitar el tuit
     tweet = st.text_input(f"¿Qué tuit tienes en mente, {user_name}? Escribe tu idea aquí:")
     if tweet:
         try:
             lang = detect(tweet)
         except langdetect.lang_detect_exception.LangDetectException:
-            st.write("No pude detectar el idioma de tu tuit. Por favor, intenta de nuevo.")
-            lang = 'en' 
-            lang ='' # Por defecto, inglés
+            st.write("No pude detectar el idioma de tu tuit. Por defecto, usaré inglés.")
+            lang = 'en'
 
+        # Preprocesar el tuit
         processed_tweet = preprocess(tweet, lang)
+
+        # Generar predicción
         prediction = model.predict(vectorizer.transform([processed_tweet]))[0]
         confidence = model.predict_proba(vectorizer.transform([processed_tweet]))[0].max() * 100
+
+        # Mostrar resultados
         viral_text = "🔥 ¡Este tuit tiene potencial de ser viral!" if prediction else "💡 Quizás este tuit no se haga viral."
         st.markdown(f"### **Predicción:** {viral_text}")
         st.markdown(f"🔍 **Confianza del modelo:** {confidence:.2f}%")
 
+        # Generar recomendaciones
         recommendations = generate_recommendations(tweet, lang)
         if recommendations:
             st.subheader(f"🌟 Recomendaciones para mejorar tu tuit, {user_name}:")

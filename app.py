@@ -1,93 +1,130 @@
 import streamlit as st
 import pickle
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
 import nltk
-import langdetect
-from langdetect import detect
+import re
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from langdetect import detect, LangDetectException
+from textblob import TextBlob
 
-# Descargar recursos necesarios de NLTK
-nltk.download('punkt')
+# Descargar recursos necesarios
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# Cargar modelos desde los archivos pickle
+# Inicializar historial en sesión
+if 'sentiments' not in st.session_state:
+    st.session_state.sentiments = []
+if 'length_vs_confidence' not in st.session_state:
+    st.session_state.length_vs_confidence = []
+if 'confidence_data' not in st.session_state:
+    st.session_state.confidence_data = []
+
+# Cargar modelos
 try:
     with open('model.pkl', 'rb') as model_file:
         model = pickle.load(model_file)
     with open('vectorizer.pkl', 'rb') as vec_file:
         vectorizer = pickle.load(vec_file)
 except FileNotFoundError as e:
-    st.error(f"Error: No se encontraron los archivos necesarios: {e}")
+    st.error(f"Error al cargar modelos: {e}")
     st.stop()
 
-# Preprocesamiento de texto
+# Preprocesamiento
 stop_words_en = set(stopwords.words('english'))
 stop_words_es = set(stopwords.words('spanish'))
 lemmatizer = WordNetLemmatizer()
 
+def analyze_sentiment(text):
+    polarity = TextBlob(text).sentiment.polarity
+    if polarity > 0.1:
+        return "Positivo", polarity
+    elif polarity < -0.1:
+        return "Negativo", polarity
+    else:
+        return "Neutral", polarity
+
 def preprocess(text, lang):
-    tokens = word_tokenize(text.lower())
     stop_words = stop_words_es if lang == 'es' else stop_words_en
-    tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalnum() and word not in stop_words]
-    return ' '.join(tokens)
+    tokens = re.findall(r'\b\w+\b', text.lower())
+    tokens = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
+    tweet_length = len(text.split())
+    sentiment_category, sentiment_value = analyze_sentiment(text)
+    return ' '.join(tokens), tweet_length, sentiment_category, sentiment_value
 
-# Generar recomendaciones para el tuit
-def generate_recommendations(tweet, lang):
-    recommendations = []
+def generate_recommendations(tweet, lang='es'):
+    recs = []
     if len(tweet.split()) < 5:
-        recommendations.append("Haz tu tuit más largo agregando detalles." if lang == 'es' else "Make your tweet longer by adding details.")
+        recs.append("Haz tu tuit más largo agregando detalles.")
     if "!" not in tweet:
-        recommendations.append("Usa signos de exclamación para captar más atención." if lang == 'es' else "Use exclamation marks to grab more attention.")
-    popular_emojis = ["🎉", "🔥", "💡", "😊", "💬"]
-    if not any(emoji in tweet for emoji in popular_emojis):
-        recommendations.append("Prueba agregar emojis como 🎉 para hacerlo más atractivo." if lang == 'es' else "Consider adding emojis like 🎉 to make it more engaging.")
-    common_keywords_es = ["increíble", "nuevo", "gratis", "hoy", "tendencia"]
-    common_keywords_en = ["amazing", "new", "free", "today", "trending"]
-    common_keywords = common_keywords_es if lang == 'es' else common_keywords_en
-    if not any(word in tweet.lower() for word in common_keywords):
-        recommendations.append("Incluye palabras clave populares como 'gratis', 'nuevo' o 'hoy'." if lang == 'es' else "Include popular keywords like 'free', 'new', or 'today'.")
-    return recommendations
+        recs.append("Usa signos de exclamación para captar más atención.")
+    if not any(emoji in tweet for emoji in ["🎉", "🔥", "💡", "😊", "💬"]):
+        recs.append("Prueba agregar emojis como 🎉 para hacerlo más atractivo.")
+    if not any(word in tweet.lower() for word in ["increíble", "nuevo", "gratis", "hoy", "tendencia"]):
+        recs.append("Incluye palabras clave populares como 'gratis', 'nuevo' o 'hoy'.")
+    return recs
 
-# Interfaz en Streamlit
-st.title("🧠 Predicción de Tuits Virales con IA")
-st.write("¡Hola! 👋 Soy tu asistente de predicción de tuits virales.")
+# Interfaz
+st.title("Predicción de Tuits Virales con IA")
+st.write("¡Hola! Soy tu asistente de predicción de tuits virales. ")
 
-# Solicitar nombre del usuario
-user_name = st.text_input("Primero, ¿cómo te llamas? 😊")
+user_name = st.text_input("¿Cómo te llamas?")
 if user_name:
-    st.write(f"¡Encantado de conocerte, {user_name}! 🎉")
-    st.write("Estoy aquí para ayudarte a predecir si tu tuit tiene potencial de ser viral.")
+    st.write(f"¡Encantado, {user_name}! Escribe tu tuit y veamos qué tan viral puede ser. ")
+    tweet = st.text_input("Escribe tu tuit aquí:")
 
-    # Solicitar el tuit
-    tweet = st.text_input(f"¿Qué tuit tienes en mente, {user_name}? Escribe tu idea aquí:")
     if tweet:
         try:
             lang = detect(tweet)
-        except langdetect.lang_detect_exception.LangDetectException:
-            st.write("No pude detectar el idioma de tu tuit. Por defecto, usaré inglés.")
-            lang = 'en'
+        except LangDetectException:
+            lang = 'es'
 
-        # Preprocesar el tuit
-        processed_tweet = preprocess(tweet, lang)
+        processed_tweet, length, sentiment_cat, sentiment_val = preprocess(tweet, lang)
+        vector = vectorizer.transform([processed_tweet])
+        confidence = model.predict_proba(vector)[0].max() * 100
+        prediction = model.predict(vector)[0]
 
-        # Generar predicción
-        prediction = model.predict(vectorizer.transform([processed_tweet]))[0]
-        confidence = model.predict_proba(vectorizer.transform([processed_tweet]))[0].max() * 100
-
-        # Mostrar resultados
-        viral_text = "🔥 ¡Este tuit tiene potencial de ser viral!" if prediction else "💡 Quizás este tuit no se haga viral."
+        viral_text = "🔥 ¡Este tuit tiene potencial de ser viral!" if confidence >= 75 else "💡 Este tuit tiene un bajo potencial de ser viral."
         st.markdown(f"### **Predicción:** {viral_text}")
-        st.markdown(f"🔍 **Confianza del modelo:** {confidence:.2f}%")
+        st.markdown(f"**Confianza del modelo:** {confidence:.2f}%")
 
-        # Generar recomendaciones
-        recommendations = generate_recommendations(tweet, lang)
-        if recommendations:
-            st.subheader(f"🌟 Recomendaciones para mejorar tu tuit, {user_name}:")
-            for rec in recommendations:
-                st.write(f"- {rec}")
+        recs = generate_recommendations(tweet, lang)
+        if recs:
+            st.subheader("Recomendaciones para mejorar tu tuit:")
+            for r in recs:
+                st.write(f"- {r}")
         else:
-            st.write(f"¡Tu tuit ya es perfecto, {user_name}! 🎉")
+            st.write("¡Tu tuit ya es excelente!")
 
-        st.write("¿Quieres intentarlo con otro tuit? ¡Estoy aquí para ayudarte! 🚀")
+        st.write(f"**Longitud del tuit:** {length} palabras")
+        st.write(f"**Sentimiento del tuit:** {sentiment_cat} (valor: {sentiment_val:.2f})")
+
+        # Guardar en sesión
+        st.session_state.sentiments.append(sentiment_cat)
+        st.session_state.length_vs_confidence.append((length, confidence))
+        st.session_state.confidence_data.append({'Sentimiento': sentiment_cat, 'Confianza': confidence})
+
+        # Gráfica 1: Longitud vs Confianza
+        st.subheader(" Longitud del tuit vs Confianza de viralidad")
+        df1 = pd.DataFrame(st.session_state.length_vs_confidence, columns=["Longitud", "Confianza"])
+        fig1, ax1 = plt.subplots()
+        sns.scatterplot(data=df1, x="Longitud", y="Confianza", s=100, color='blue', ax=ax1)
+        ax1.set_xlabel("Longitud del tuit")
+        ax1.set_ylabel("Confianza (%)")
+        ax1.set_title("Relación entre Longitud y Confianza")
+        st.pyplot(fig1)
+
+        # Gráfica 2: Confianza promedio por Sentimiento
+        st.subheader("Confianza promedio de viralidad por sentimiento")
+        df2 = pd.DataFrame(st.session_state.confidence_data)
+        avg_conf = df2.groupby("Sentimiento")["Confianza"].mean().reset_index()
+        fig2, ax2 = plt.subplots()
+        sns.barplot(data=avg_conf, x="Sentimiento", y="Confianza", palette="coolwarm", ax=ax2)
+        ax2.set_title("Confianza Promedio de Viralidad por Sentimiento")
+        ax2.set_ylabel("Confianza Promedio (%)")
+        ax2.set_xlabel("Sentimiento")
+        ax2.set_ylim(0, 100)
+        st.pyplot(fig2)
+

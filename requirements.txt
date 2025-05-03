@@ -1,8 +1,8 @@
 streamlit
-scikit-learn
+nltk
+textblob
 pandas
 matplotlib
 seaborn
-wordcloud
+scikit-learn
 langdetect
-nltk

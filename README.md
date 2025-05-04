@@ -7,5 +7,5 @@ Twitter es un espacio donde las ideas, opiniones y noticias pueden volverse vira
 Conclusión
 Este proyecto ha demostrado que es posible predecir la viralidad de un tweet con un alto grado de precisión al analizar su contenido y características utilizando técnicas avanzadas de machine learning. Durante el desarrollo de la aplicación, se identificaron factores clave que influyen en la viralidad, como la longitud del texto, el uso de palabras emocionales y el momento de publicación. Estos descubrimientos no solo mejoraron la efectividad del modelo predictivo, sino que también aportaron un mayor entendimiento sobre el comportamiento de los usuarios en Twitter.
 
-#Importante
+# Importante
 No olviden instalar todos los archivos necesarios para este proyecto

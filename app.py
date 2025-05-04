@@ -68,7 +68,7 @@ def generate_recommendations(tweet, lang='es'):
 
 # Interfaz
 st.title("Predicción de Tweets Virales con IA")
-st.write("¡Hola! Soy tu asistente de predicción de tuits virales. ")
+st.write("¡Hola! Soy tu asistente de predicción de tweets virales. ")
 
 user_name = st.text_input("¿Cómo te llamas?")
 if user_name:

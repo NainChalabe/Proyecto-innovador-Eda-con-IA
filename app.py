@@ -57,7 +57,7 @@ def preprocess(text, lang):
 def generate_recommendations(tweet, lang='es'):
     recs = []
     if len(tweet.split()) < 5:
-        recs.append("Haz tu tuit más largo agregando detalles.")
+        recs.append("Haz tu tweet más largo agregando detalles.")
     if "!" not in tweet:
         recs.append("Usa signos de exclamación para captar más atención.")
     if not any(emoji in tweet for emoji in ["🎉", "🔥", "💡", "😊", "💬"]):
@@ -67,13 +67,13 @@ def generate_recommendations(tweet, lang='es'):
     return recs
 
 # Interfaz
-st.title("Predicción de Tuits Virales con IA")
+st.title("Predicción de Tweets Virales con IA")
 st.write("¡Hola! Soy tu asistente de predicción de tuits virales. ")
 
 user_name = st.text_input("¿Cómo te llamas?")
 if user_name:
-    st.write(f"¡Encantado, {user_name}! Escribe tu tuit y veamos qué tan viral puede ser. ")
-    tweet = st.text_input("Escribe tu tuit aquí:")
+    st.write(f"¡Encantado, {user_name}! Escribe tu tweets y veamos qué tan viral puede ser. ")
+    tweet = st.text_input("Escribe tu tweet aquí:")
 
     if tweet:
         try:
@@ -86,7 +86,7 @@ if user_name:
         confidence = model.predict_proba(vector)[0].max() * 100
         prediction = model.predict(vector)[0]
 
-        viral_text = "🔥 ¡Este tuit tiene potencial de ser viral!" if confidence >= 75 else "💡 Este tuit tiene un bajo potencial de ser viral."
+        viral_text = "🔥 ¡Este tuit tiene potencial de ser viral!" if confidence >= 75 else "💡 Este tweet tiene un bajo potencial de ser viral."
         st.markdown(f"### **Predicción:** {viral_text}")
         st.markdown(f"**Confianza del modelo:** {confidence:.2f}%")
 
@@ -96,10 +96,10 @@ if user_name:
             for r in recs:
                 st.write(f"- {r}")
         else:
-            st.write("¡Tu tuit ya es excelente!")
+            st.write("¡Tu tweet ya es excelente!")
 
-        st.write(f"**Longitud del tuit:** {length} palabras")
-        st.write(f"**Sentimiento del tuit:** {sentiment_cat} (valor: {sentiment_val:.2f})")
+        st.write(f"**Longitud del tweet:** {length} palabras")
+        st.write(f"**Sentimiento del tweet:** {sentiment_cat} (valor: {sentiment_val:.2f})")
 
         # Guardar en sesión
         st.session_state.sentiments.append(sentiment_cat)
